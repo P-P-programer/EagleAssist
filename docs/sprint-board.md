@@ -7,6 +7,9 @@ Construir una base para un sistema de reconocimiento facial y control de asisten
 - [x] Inicialización del repositorio
 - [x] Enlace con el remoto de GitHub
 - [ ] Definición del alcance inicial
+- [x] Frontend React enlazado con Blade
+- [x] Estilos visuales separados en CSS dedicado
+- [x] Refresh de Vite explícito para cambios en caliente
 
 ## Area de trabajo
 - Backend Laravel: API, autenticación, asistencia y administración.
@@ -22,6 +25,8 @@ Construir una base para un sistema de reconocimiento facial y control de asisten
 - [ ] Diseñar modelo de datos para usuarios, rostros y asistencias
 - [ ] Definir integración con hardware y comunicación segura
 - [ ] Preparar pruebas y validación básica
+- [ ] Crear componentes React reales para registro y asistencia
+- [ ] Definir contrato de API para biometría
 
 ## Ignorado por `.gitignore`
 - `.env`
