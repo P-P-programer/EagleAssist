@@ -1,58 +1,133 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# EagleAssist
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+EagleAssist is a lightweight, local-first attendance and recognition prototype that connects an ESP32-CAM camera to a Laravel backend and a Python facial-recognition microservice. The goal is a simple, testable flow for capturing images from ESP32 devices, sending them to the Laravel API, forwarding to the Python recognizer, and persisting attendance records.
 
-## About Laravel
+**Architecture (high level)**
+- **ESP32-CAM**: captures images and uploads them (multipart/form-data) to the Laravel API.
+- **Laravel backend**: orchestrates the flow, persists attendance (`AttendanceRecord`), and forwards images to the Python recognition service.
+- **Python recognition service**: FastAPI app that accepts images, returns recognition results, and can be used for enroll/list operations.
+- **Frontend**: Vite + React UI for preview, manual capture, and viewing attendance history.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+**Repository layout (important paths)**
+- `app/Http/Controllers/Api/` : Laravel API controllers (attendance endpoints).
+- `routes/api.php` : API route definitions (including `/api/v1/attendance/from-image`).
+- `python-recognition-service/` : FastAPI recognizer service (see its own README).
+- `esp32/esp32cam_multipart_example/` : ESP32 example sketch and config templates.
+- `resources/js/components/App.jsx` : Frontend camera & workflow UI.
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+**Quick Start (development)**
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
-
-## Learning Laravel
-
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
-
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
-
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
-
-## Agentic Development
-
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+1) Laravel backend
 
 ```bash
-composer require laravel/boost --dev
-
-php artisan boost:install
+# from repo root
+cp .env.example .env
+composer install
+php artisan key:generate
+php artisan migrate
+php artisan serve --host 0.0.0.0 --port=8001
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+2) Python recognition service
 
-## Contributing
+```bash
+cd python-recognition-service
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+# run on port 8000 (change port if busy)
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+3) Frontend (development)
 
-## Code of Conduct
+```bash
+pnpm install
+pnpm dev
+```
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+4) ESP32-CAM: configure and flash
 
-## Security Vulnerabilities
+- Copy `esp32/example_config.h` → `esp32/config.h` and set `WIFI_SSID`, `WIFI_PASS`, `LARAVEL_URL` (use your machine LAN IP, e.g. `http://192.168.1.10:8001`) and `RECOGNITION_TOKEN` to match Laravel `.env`.
+- Open `esp32/esp32cam_multipart_example/esp32cam_multipart_example.ino` in Arduino IDE, select the correct board and upload.
+- Open serial monitor at `115200` to follow connection and upload logs.
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+**Environment / Tokens**
+- Set `RECOGNITION_TOKEN` in Laravel `.env` and use the same token in `esp32/config.h` and `python-recognition-service` environment (the FastAPI service enforces the shared token for important endpoints).
 
-## License
+**Git / Cleanup (ignored files)**
+- The repo now ignores common Python artifacts in `/.gitignore` and `python-recognition-service/.gitignore`.
+- If Python caches or a virtualenv are already tracked, run one of the commands below from the repo root:
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+```bash
+# Option A — remove tracked python service env/cache files only
+git rm -r --cached python-recognition-service/.venv || true
+git rm -r --cached python-recognition-service/venv || true
+git rm -r --cached python-recognition-service/__pycache__ || true
+git rm -r --cached python-recognition-service/.pytest_cache || true
+git commit -m "chore: stop tracking python env/cache files"
+
+# Option B — reapply .gitignore globally (safe when many ignored files are tracked)
+git rm -r --cached .
+git add .
+git commit -m "chore: apply .gitignore and stop tracking ignored files"
+```
+
+**Troubleshooting**
+- If `uvicorn` fails with "Address already in use" on port `8000`, find and stop the occupying process:
+
+```bash
+sudo lsof -i :8000
+sudo kill <PID>
+# or run the service on a different port
+uvicorn app.main:app --host 0.0.0.0 --port 8002
+```
+
+- If the ESP32 cannot reach the Laravel server, make sure `LARAVEL_URL` is the LAN IP (not `127.0.0.1`) and that the machine firewall allows incoming connections on the chosen port.
+
+**Files to inspect / useful links**
+- Laravel attendance entry point: [routes/api.php](routes/api.php)
+- Attendance controller: [app/Http/Controllers/Api/AttendanceController.php](app/Http/Controllers/Api/AttendanceController.php)
+- Python service README and code: [python-recognition-service/README.md](python-recognition-service/README.md)
+- ESP32 sketch: [esp32/esp32cam_multipart_example/esp32cam_multipart_example.ino](esp32/esp32cam_multipart_example/esp32cam_multipart_example.ino)
+- Root `.gitignore`: [.gitignore](.gitignore)
+
+**Contributing / Next steps**
+- Hardware testing: flash the ESP32 and run end-to-end tests (ESP32 → Laravel → Python). Open serial at `115200`.
+- Optionally: add HTTPS, per-device tokens, and production hardening for the Python service.
+
+**License**
+This project reuses tooling around Laravel; the repo is MIT licensed unless otherwise noted in individual vendor packages.
+
+**Python Setup & Cleanup**
+- **Ignore files:** This repository now ignores common Python artifacts (virtualenvs, caches, compiled files, test/mypy caches) via the root `.gitignore` and the `python-recognition-service/.gitignore`.
+- **If Python files are already tracked:** Run one of the following from the repo root to untrack virtualenvs/caches without deleting local files:
+
+```bash
+# Option A — untrack common python service env/cache paths
+git rm -r --cached python-recognition-service/.venv || true
+git rm -r --cached python-recognition-service/venv || true
+git rm -r --cached python-recognition-service/__pycache__ || true
+git rm -r --cached python-recognition-service/.pytest_cache || true
+git commit -m "chore: stop tracking python env/cache files"
+
+# Option B — reapply .gitignore globally (safe and comprehensive)
+git rm -r --cached .
+git add .
+git commit -m "chore: apply .gitignore and stop tracking ignored files"
+```
+
+- **Create and use a venv for the recognizer service:**
+
+```bash
+cd python-recognition-service
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+# run the service
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+- **Notes:**
+	- Use the machine LAN IP (example `http://192.168.x.y:8001`) in `esp32/config.h` so ESP32 devices can reach the Laravel server.
+	- If you prefer the agent to remove the tracked files for you, I can run the safe `git rm --cached` commands here — tell me to proceed and confirm you want me to create that commit.

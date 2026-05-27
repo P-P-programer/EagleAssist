@@ -34,6 +34,19 @@ function PrototypeCard({ title, eyebrow, description, actionLabel, accent, onAct
     );
 }
 
+function CameraFrame({ title, subtitle, children, footer }) {
+    return (
+        <section className="glass-panel overflow-hidden p-6 md:p-7">
+            <span className="field-chip">{subtitle}</span>
+            <h3 className="mt-4 text-2xl font-semibold text-ink">{title}</h3>
+            <div className="mt-6 overflow-hidden rounded-[28px] border border-brand-100 bg-slate-950 shadow-[0_24px_60px_rgba(15,23,42,0.12)]">
+                {children}
+            </div>
+            {footer ? <div className="mt-4 text-sm leading-6 text-muted">{footer}</div> : null}
+        </section>
+    );
+}
+
 function SwitchButton({ active, label, onClick }) {
     return (
         <button
@@ -70,6 +83,10 @@ function Dashboard() {
     const [attendanceMode, setAttendanceMode] = useState('Entrada');
     const [searchQuery, setSearchQuery] = useState('');
     const [isLoadingDemoData, setIsLoadingDemoData] = useState(true);
+    const [cameraPreviewUrl, setCameraPreviewUrl] = useState('');
+    const [capturedPhoto, setCapturedPhoto] = useState('');
+    const [lastCaptureName, setLastCaptureName] = useState('');
+    const [lastCaptureStatus, setLastCaptureStatus] = useState('Esperando captura');
     const [registeredFaces, setRegisteredFaces] = useState([
         { id: 1, name: 'Test User', registeredAt: '08:00', isActive: true },
         { id: 2, name: 'Maria Lopez', registeredAt: '08:15', isActive: true },
@@ -164,6 +181,55 @@ function Dashboard() {
             message,
             tone: 'success',
         });
+    };
+
+    const openImagePicker = (onImageSelected) => {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*';
+        input.onchange = () => {
+            const file = input.files?.[0];
+            if (!file) {
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = () => onImageSelected(typeof reader.result === 'string' ? reader.result : '');
+            reader.readAsDataURL(file);
+        };
+        input.click();
+    };
+
+    const sendCapturedImage = async ({ imageDataUrl, action }) => {
+        if (!imageDataUrl) {
+            throw new Error('Primero captura o selecciona una imagen.');
+        }
+
+        const response = await fetch('/api/v1/attendance/from-image', {
+            method: 'POST',
+            headers: {
+                Accept: 'application/json',
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                image_base64: imageDataUrl,
+                action,
+                device_id: 'web-preview',
+                captured_at: new Date().toISOString(),
+            }),
+        });
+
+        const payload = await response.json();
+
+        if (!response.ok) {
+            throw new Error(payload?.message || 'No se pudo enviar la captura.');
+        }
+
+        setLastCaptureName(payload.face?.name || payload.record?.person || 'Desconocido');
+        setLastCaptureStatus(payload.match ? `Coincidencia ${Math.round((payload.confidence || 0) * 100)}%` : 'Sin coincidencia');
+        await loadDashboardData();
+
+        return payload;
     };
 
     const registerFace = (event) => {
@@ -298,6 +364,150 @@ function Dashboard() {
                     accent="Entrada o salida"
                     onAction={() => handleToast('El panel de asistencia quedó listo para alternar entrada y salida.')}
                 />
+            </section>
+
+            <section className="mt-6 grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+                <CameraFrame
+                    subtitle="Vista de cámara"
+                    title="Captura desde ESP32-CAM"
+                    footer="La UI puede mostrar un snapshot o un stream MJPEG. Si aún no tienes stream, carga una imagen de prueba para validar el flujo completo."
+                >
+                    <div className="grid gap-4 p-4 md:grid-cols-[1.35fr_0.65fr]">
+                        <div className="overflow-hidden rounded-[22px] border border-white/10 bg-slate-900">
+                            {cameraPreviewUrl ? (
+                                <img src={cameraPreviewUrl} alt="Vista de cámara" className="h-[340px] w-full object-cover" />
+                            ) : (
+                                <div className="flex h-[340px] flex-col items-center justify-center px-6 text-center text-slate-200">
+                                    <p className="text-sm uppercase tracking-[0.3em] text-brand-300">Vista previa</p>
+                                    <p className="mt-4 text-2xl font-semibold">Conecta aquí el stream o snapshot de la cámara</p>
+                                    <p className="mt-3 max-w-md text-sm leading-6 text-slate-300">
+                                        Para el ESP32-CAM normalmente usarás una URL de snapshot o un stream MJPEG. Mientras tanto puedes cargar una captura manual.
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="grid content-start gap-3 bg-slate-950/90 p-4 text-sm text-slate-100">
+                            <label className="grid gap-2">
+                                <span className="font-semibold text-white">URL de preview</span>
+                                <input
+                                    type="text"
+                                    value={cameraPreviewUrl}
+                                    onChange={(event) => setCameraPreviewUrl(event.target.value)}
+                                    placeholder="http://192.168.1.50/stream"
+                                    className="rounded-2xl border border-white/10 bg-slate-900 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-400 focus:border-brand-400"
+                                />
+                            </label>
+
+                            <button
+                                type="button"
+                                className="soft-button-primary"
+                                onClick={() => openImagePicker((dataUrl) => {
+                                    setCapturedPhoto(dataUrl);
+                                    setLastCaptureStatus('Captura lista para enviar');
+                                    setLastCaptureName('Pendiente de análisis');
+                                })}
+                            >
+                                Capturar imagen
+                            </button>
+
+                            <button
+                                type="button"
+                                className="soft-button-secondary"
+                                onClick={() => {
+                                    setCapturedPhoto('');
+                                    setLastCaptureName('');
+                                    setLastCaptureStatus('Esperando captura');
+                                }}
+                            >
+                                Limpiar captura
+                            </button>
+
+                            <div className="rounded-[18px] border border-white/10 bg-white/5 p-4">
+                                <p className="text-xs uppercase tracking-[0.2em] text-brand-300">Estado</p>
+                                <p className="mt-2 text-lg font-semibold text-white">{lastCaptureStatus}</p>
+                                <p className="mt-2 text-sm text-slate-300">{lastCaptureName || 'Todavía no hay una persona detectada.'}</p>
+                            </div>
+                        </div>
+                    </div>
+                </CameraFrame>
+
+                <section className="glass-panel p-6 md:p-7">
+                    <span className="field-chip">Flujo guiado</span>
+                    <h3 className="mt-4 text-2xl font-semibold text-ink">Confirmación rápida</h3>
+                    <p className="mt-3 text-sm leading-6 text-muted">
+                        Después de capturar, la UI deja elegir si esa imagen sirve para registro o para asistencia. Así validas el flujo antes de montar el hardware completo.
+                    </p>
+
+                    <div className="mt-6 grid gap-4">
+                        <div className="rounded-[24px] border border-brand-100 bg-brand-50/70 p-4">
+                            <p className="text-sm font-semibold text-ink">Registro</p>
+                            <p className="mt-2 text-sm leading-6 text-muted">
+                                Usa el nombre detectado como base y confírmalo antes de guardar el rostro.
+                            </p>
+                            <button
+                                type="button"
+                                className="soft-button-primary mt-4 w-full"
+                                onClick={() => {
+                                    if (lastCaptureName) {
+                                        setFullName(lastCaptureName);
+                                    }
+
+                                    pushToast({
+                                        title: 'Registro listo',
+                                        message: 'Ya puedes confirmar el nombre del rostro desde la captura.',
+                                        tone: 'success',
+                                    });
+                                }}
+                            >
+                                Usar nombre detectado
+                            </button>
+                        </div>
+
+                        <div className="rounded-[24px] border border-brand-100 bg-brand-50/70 p-4">
+                            <p className="text-sm font-semibold text-ink">Asistencia</p>
+                            <p className="mt-2 text-sm leading-6 text-muted">
+                                Si la captura coincide, marca entrada o salida con la cara detectada y el backend guarda el evento.
+                            </p>
+                            <div className="mt-4 grid grid-cols-2 gap-3">
+                                <button
+                                    type="button"
+                                    className="soft-button-secondary"
+                                    onClick={async () => {
+                                        try {
+                                            await sendCapturedImage({ imageDataUrl: capturedPhoto, action: 'Entrada' });
+                                            pushToast({ title: 'Entrada registrada', message: 'La captura fue procesada y guardada.', tone: 'success' });
+                                        } catch (error) {
+                                            pushToast({ title: 'No se pudo registrar', message: error.message, tone: 'error' });
+                                        }
+                                    }}
+                                >
+                                    Marcar entrada
+                                </button>
+                                <button
+                                    type="button"
+                                    className="soft-button-secondary"
+                                    onClick={async () => {
+                                        try {
+                                            await sendCapturedImage({ imageDataUrl: capturedPhoto, action: 'Salida' });
+                                            pushToast({ title: 'Salida registrada', message: 'La captura fue procesada y guardada.', tone: 'success' });
+                                        } catch (error) {
+                                            pushToast({ title: 'No se pudo registrar', message: error.message, tone: 'error' });
+                                        }
+                                    }}
+                                >
+                                    Marcar salida
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {capturedPhoto ? (
+                        <div className="mt-6 overflow-hidden rounded-[24px] border border-brand-100 bg-white shadow-sm">
+                            <img src={capturedPhoto} alt="Captura actual" className="h-64 w-full object-cover" />
+                        </div>
+                    ) : null}
+                </section>
             </section>
 
             <section className="mt-6 grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">

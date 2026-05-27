@@ -3,7 +3,9 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from time import monotonic
 
-from fastapi import FastAPI, HTTPException
+import os
+
+from fastapi import FastAPI, HTTPException, Depends, Header, status
 
 from .schemas import EnrollmentRequest, EnrollmentResponse, FaceSummary, HealthResponse, RecognitionRequest, RecognitionResponse
 from .service import FaceRegistry
@@ -17,6 +19,24 @@ app = FastAPI(
 started_at = monotonic()
 registry = FaceRegistry()
 registry.seed()
+
+
+def verify_token(
+    authorization: str | None = Header(default=None),
+    x_api_key: str | None = Header(default=None, alias="X-Api-Key"),
+) -> None:
+    expected = os.environ.get('RECOGNITION_TOKEN')
+    if not expected:
+        return None
+
+    token = None
+    if authorization and authorization.startswith('Bearer '):
+        token = authorization.split(' ', 1)[1]
+    elif x_api_key:
+        token = x_api_key
+
+    if token != expected:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='Invalid or missing API token')
 
 
 @app.get("/health", response_model=HealthResponse)
@@ -38,7 +58,7 @@ def list_faces() -> list[FaceSummary]:
 
 
 @app.post("/enroll", response_model=EnrollmentResponse)
-def enroll_face(payload: EnrollmentRequest) -> EnrollmentResponse:
+def enroll_face(payload: EnrollmentRequest, _=Depends(verify_token)) -> EnrollmentResponse:
     face = registry.enroll(payload.name)
     return EnrollmentResponse(
         face_id=face.face_id,
@@ -49,12 +69,12 @@ def enroll_face(payload: EnrollmentRequest) -> EnrollmentResponse:
 
 
 @app.post("/recognize", response_model=RecognitionResponse)
-def recognize_face(payload: RecognitionRequest) -> RecognitionResponse:
+def recognize_face(payload: RecognitionRequest, _=Depends(verify_token)) -> RecognitionResponse:
     return registry.recognize(payload)
 
 
 @app.patch("/faces/{face_id}/deactivate", response_model=FaceSummary)
-def deactivate_face(face_id: int) -> FaceSummary:
+def deactivate_face(face_id: int, _=Depends(verify_token)) -> FaceSummary:
     face = registry.deactivate(face_id)
     if face is None:
         raise HTTPException(status_code=404, detail="Face not found")
@@ -62,7 +82,7 @@ def deactivate_face(face_id: int) -> FaceSummary:
 
 
 @app.patch("/faces/{face_id}/reactivate", response_model=FaceSummary)
-def reactivate_face(face_id: int) -> FaceSummary:
+def reactivate_face(face_id: int, _=Depends(verify_token)) -> FaceSummary:
     face = registry.reactivate(face_id)
     if face is None:
         raise HTTPException(status_code=404, detail="Face not found")

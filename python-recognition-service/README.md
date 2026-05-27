@@ -30,3 +30,6 @@ Servicio Python de intermediación para el reconocimiento facial.
 cd python-recognition-service
 python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
+
+## Seguridad (token)
+Para mayor seguridad puedes definir `RECOGNITION_TOKEN` en el entorno. Si está presente, el servicio exigirá un header `Authorization: Bearer <token>` o `X-Api-Key: <token>` en los endpoints de enrolamiento y reconocimiento.

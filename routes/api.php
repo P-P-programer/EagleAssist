@@ -20,4 +20,5 @@ Route::prefix('v1')->group(function () {
     Route::patch('/faces/{face}/reactivate', [FaceController::class, 'reactivate']);
 
     Route::post('/attendance/validate', [AttendanceController::class, 'store']);
+    Route::post('/attendance/from-image', [AttendanceController::class, 'recognizeAndRecord']);
 });
