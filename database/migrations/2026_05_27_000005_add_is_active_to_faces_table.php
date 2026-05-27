@@ -8,15 +8,19 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('faces', function (Blueprint $table) {
-            $table->boolean('is_active')->default(true)->after('registered_at');
-        });
+        if (! Schema::hasColumn('faces', 'is_active')) {
+            Schema::table('faces', function (Blueprint $table) {
+                $table->boolean('is_active')->default(true)->after('registered_at');
+            });
+        }
     }
 
     public function down(): void
     {
-        Schema::table('faces', function (Blueprint $table) {
-            $table->dropColumn('is_active');
-        });
+        if (Schema::hasColumn('faces', 'is_active')) {
+            Schema::table('faces', function (Blueprint $table) {
+                $table->dropColumn('is_active');
+            });
+        }
     }
 };

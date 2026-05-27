@@ -12,19 +12,21 @@ class DashboardController extends Controller
     {
         $faces = Face::query()
             ->orderByDesc('registered_at')
-            ->get(['id', 'name', 'registered_at'])
+            ->get(['id', 'name', 'registered_at', 'is_active'])
             ->map(fn (Face $face) => [
                 'id' => $face->id,
                 'name' => $face->name,
                 'registeredAt' => optional($face->registered_at)->format('H:i'),
+                'isActive' => $face->is_active,
             ])
             ->values();
 
         $records = AttendanceRecord::query()
             ->orderByDesc('recorded_at')
-            ->get(['id', 'person_name', 'action', 'recorded_at', 'status'])
+            ->get(['id', 'face_id', 'person_name', 'action', 'recorded_at', 'status'])
             ->map(fn (AttendanceRecord $record) => [
                 'id' => $record->id,
+                'faceId' => $record->face_id,
                 'person' => $record->person_name,
                 'action' => $record->action,
                 'time' => optional($record->recorded_at)->format('H:i'),

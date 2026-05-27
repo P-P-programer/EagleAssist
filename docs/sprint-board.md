@@ -17,6 +17,10 @@ Construir una base para un sistema de reconocimiento facial y control de asisten
 - [x] Frontend consumiendo datos del backend
 - [x] Registro de rostro contra API y base de datos
 - [x] Marcación de asistencia contra API y base de datos
+- [x] API separada en controladores Laravel
+- [x] Baja suave y reactivación de rostros sin borrar historial
+- [x] Asistencia persistida con `face_id` visible en la vista
+- [x] Servicio Python de reconocimiento facial inicial
 
 ## Area de trabajo
 - Backend Laravel: API, autenticación, asistencia y administración.
@@ -26,13 +30,14 @@ Construir una base para un sistema de reconocimiento facial y control de asisten
 - Documentacion y pruebas: avance del sprint, validacion y checklist.
 
 ## Pendiente
-- [ ] Elegir arquitectura entre ESP32, API Laravel y almacenamiento de biometría
 - [ ] Definir flujo de enrolamiento facial
 - [ ] Definir flujo de marcación de asistencia
 - [ ] Diseñar modelo de datos para usuarios, rostros y asistencias
 - [ ] Definir integración con hardware y comunicación segura
 - [ ] Preparar pruebas y validación básica
 - [ ] Definir contrato de API para biometría
+- [ ] Conectar Laravel con el servicio Python
+- [ ] Definir payload real de imagen para el ESP32-CAM
 
 ## Ignorado por `.gitignore`
 - `.env`
@@ -44,7 +49,8 @@ Construir una base para un sistema de reconocimiento facial y control de asisten
 
 ## Decisiones
 - Laravel será la base del backend web y API.
-- El ESP32 se conectará al backend para sincronizar datos y eventos.
+- El ESP32-CAM enviará imagen al servicio Python de reconocimiento.
+- Laravel orquestará persistencia, reglas de negocio y auditoría.
 - La biometría debe tratarse como dato sensible y quedar documentada antes de implementar.
 
 ## Notas del sprint

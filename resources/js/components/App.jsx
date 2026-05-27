@@ -343,43 +343,44 @@ function Dashboard() {
                                         {face.name}{face.isActive ? '' : ' · Inactivo'}
                                     </button>
 
-                                    {face.isActive ? (
-                                        <button
-                                            type="button"
-                                            className="rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-700 transition hover:bg-rose-100"
-                                            onClick={async () => {
-                                                try {
-                                                    const response = await fetch(`/api/v1/faces/${face.id}/deactivate`, {
-                                                        method: 'PATCH',
-                                                        headers: {
-                                                            Accept: 'application/json',
-                                                            'Content-Type': 'application/json',
-                                                        },
-                                                    });
-                                                    const payload = await response.json();
+                                    <button
+                                        type="button"
+                                        className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${face.isActive ? 'border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100' : 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'}`}
+                                        onClick={async () => {
+                                            const endpoint = face.isActive ? `/api/v1/faces/${face.id}/deactivate` : `/api/v1/faces/${face.id}/reactivate`;
+                                            const actionLabel = face.isActive ? 'desactivar' : 'reactivar';
 
-                                                    if (!response.ok) {
-                                                        throw new Error(payload?.message || 'No se pudo desactivar el rostro.');
-                                                    }
+                                            try {
+                                                const response = await fetch(endpoint, {
+                                                    method: 'PATCH',
+                                                    headers: {
+                                                        Accept: 'application/json',
+                                                        'Content-Type': 'application/json',
+                                                    },
+                                                });
+                                                const payload = await response.json();
 
-                                                    await loadDashboardData();
-                                                    pushToast({
-                                                        title: 'Rostro desactivado',
-                                                        message: `${payload.face?.name || face.name} quedó inactivo sin borrar su historial.`,
-                                                        tone: 'success',
-                                                    });
-                                                } catch (error) {
-                                                    pushToast({
-                                                        title: 'No se pudo desactivar',
-                                                        message: error.message,
-                                                        tone: 'error',
-                                                    });
+                                                if (!response.ok) {
+                                                    throw new Error(payload?.message || `No se pudo ${actionLabel} el rostro.`);
                                                 }
-                                            }}
-                                        >
-                                            Desactivar
-                                        </button>
-                                    ) : null}
+
+                                                await loadDashboardData();
+                                                pushToast({
+                                                    title: face.isActive ? 'Rostro desactivado' : 'Rostro reactivado',
+                                                    message: `${payload.face?.name || face.name} quedó ${face.isActive ? 'inactivo' : 'activo'} sin borrar su historial.`,
+                                                    tone: 'success',
+                                                });
+                                            } catch (error) {
+                                                pushToast({
+                                                    title: `No se pudo ${actionLabel}`,
+                                                    message: error.message,
+                                                    tone: 'error',
+                                                });
+                                            }
+                                        }}
+                                    >
+                                        {face.isActive ? 'Desactivar' : 'Reactivar'}
+                                    </button>
                                 </div>
                             ))}
                         </div>
